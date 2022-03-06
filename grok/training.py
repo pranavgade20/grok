@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import comet_ml
 import argparse
 import copy
 import json
@@ -16,9 +16,10 @@ import time
 import numpy as np
 import torch
 import torch.nn.functional as F
+from comet_ml import Experiment
 from pytorch_lightning import LightningModule, Trainer
 from pytorch_lightning.callbacks import Callback, ModelCheckpoint
-from pytorch_lightning.loggers import CSVLogger
+from pytorch_lightning.loggers import CSVLogger, CometLogger
 from torch import Tensor
 from torch.optim.lr_scheduler import LambdaLR
 
@@ -702,7 +703,15 @@ def train(hparams: Namespace) -> None:
 
     # Create the model
     model = TrainableTransformer(hparams).float()
-
+    experiment = Experiment(
+        api_key="Ch9OIxODMWCZuK2LSscvbculp",
+        project_name="grok",
+    )
+    comet_logger = CometLogger(
+        api_key='Ch9OIxODMWCZuK2LSscvbculp',
+        rest_api_key='Ch9OIxODMWCZuK2LSscvbculp',
+        # optimizer_data=hparams,
+    )
     torch.save(model, os.path.join(checkpoint_path, "init.pt"))
 
     logger = CSVLogger(hparams.logdir)
@@ -722,7 +731,7 @@ def train(hparams: Namespace) -> None:
         "val_check_interval": 1,
         "profiler": False,
         # "checkpoint_callback": checkpointer,
-        "logger": logger,
+        "logger": [comet_logger, logger],
         "log_every_n_steps": 1,
         "flush_logs_every_n_steps": 1000,
     }
