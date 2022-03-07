@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Import comet_ml at the top of your file
+import comet_ml
 
 import grok
 import os

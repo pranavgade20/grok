@@ -458,10 +458,10 @@ class TrainableTransformer(LightningModule):
         lr = schedulers["scheduler"].optimizer.param_groups[0]["lr"]
         output = {
             "loss": loss,
-            "partial_train_loss": coeff * loss,
-            "partial_train_accuracy": coeff * accuracy,
-            "learning_rate": torch.tensor([lr]),
-            "y_hat_rhs": y_hat_rhs,
+            "partial_train_loss": (coeff * loss).detach(),
+            "partial_train_accuracy": (coeff * accuracy).detach(),
+            "learning_rate": torch.tensor([lr]).detach(),
+            "y_hat_rhs": y_hat_rhs.detach(),
             "partial_attentions": attentions,
             "partial_values": values,
         }
@@ -519,7 +519,7 @@ class TrainableTransformer(LightningModule):
                 "fwd_time_in_epoch": self.fwd_time_in_epoch,
             }
             for k, v in logs.items():
-                self.log(k, v)
+                self.log(k, float(v))
 
     def validation_step(self, batch, batch_idx):
         """
@@ -599,7 +599,7 @@ class TrainableTransformer(LightningModule):
                 logs["full_train_acc"] = tr_acc
 
             for k, v in logs.items():
-                self.log(k, v)
+                self.log(k, float(v))
         # save a checkpoint if the epoch is a power of 2
         if (
             self.current_epoch > 0
