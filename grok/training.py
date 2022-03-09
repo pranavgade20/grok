@@ -23,6 +23,7 @@ from pytorch_lightning.loggers import CSVLogger, CometLogger
 from torch import Tensor
 from torch.optim.lr_scheduler import LambdaLR
 
+import grok.data
 import grok.metrics as metrics
 from grok.data import (
     DEFAULT_DATA_DIR,
@@ -95,6 +96,7 @@ class TrainableTransformer(LightningModule):
         parser.add_argument("--max_context_len", type=int, default=50)
 
         parser.add_argument("--math_operator", type=str, default="+")
+        parser.add_argument("--modulus", type=int, default=97)
         parser.add_argument(
             "--operand_length",
             type=int,
@@ -701,6 +703,9 @@ def train(hparams: Namespace) -> None:
     os.makedirs(checkpoint_path, exist_ok=True)
     hparams.checkpoint_path = checkpoint_path
 
+    # set modulus
+    grok.data.MODULUS = hparams.modulus
+
     # Create the model
     model = TrainableTransformer(hparams).float()
     experiment = Experiment(
@@ -710,6 +715,7 @@ def train(hparams: Namespace) -> None:
     comet_logger = CometLogger(
         api_key='Ch9OIxODMWCZuK2LSscvbculp',
         rest_api_key='Ch9OIxODMWCZuK2LSscvbculp',
+        project_name='grok'
         # optimizer_data=hparams,
     )
     torch.save(model, os.path.join(checkpoint_path, "init.pt"))
