@@ -708,15 +708,10 @@ def train(hparams: Namespace) -> None:
 
     # Create the model
     model = TrainableTransformer(hparams).float()
-    experiment = Experiment(
-        api_key="Ch9OIxODMWCZuK2LSscvbculp",
-        project_name="grok",
-    )
     comet_logger = CometLogger(
         api_key='Ch9OIxODMWCZuK2LSscvbculp',
         rest_api_key='Ch9OIxODMWCZuK2LSscvbculp',
         project_name='grok'
-        # optimizer_data=hparams,
     )
     torch.save(model, os.path.join(checkpoint_path, "init.pt"))
 
