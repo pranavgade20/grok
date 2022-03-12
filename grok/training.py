@@ -13,6 +13,7 @@ from functools import reduce
 from typing import Any, Dict, List, Optional, Tuple, Union
 import time
 
+import gin
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -69,7 +70,8 @@ class TrainableTransformer(LightningModule):
         self.next_train_epoch_to_log = 0
 
     @staticmethod
-    def add_model_specific_args(parser: ArgumentParser) -> ArgumentParser:
+    @gin.configurable
+    def add_model_specific_args(parser: ArgumentParser, modulus=97, train_data_pct=50, math_operator='+') -> ArgumentParser:
         """
         Defines the hyperparameter arguments needed by instances of this
         class. This is intended to be called when parsing command line
@@ -95,15 +97,15 @@ class TrainableTransformer(LightningModule):
         parser.add_argument("--non_linearity", type=str, default="relu")
         parser.add_argument("--max_context_len", type=int, default=50)
 
-        parser.add_argument("--math_operator", type=str, default="+")
-        parser.add_argument("--modulus", type=int, default=97)
+        parser.add_argument("--math_operator", type=str, default=math_operator)
+        parser.add_argument("--modulus", type=int, default=modulus)
         parser.add_argument(
             "--operand_length",
             type=int,
             help="for list operations, the length of the lists",
         )
 
-        parser.add_argument("--train_data_pct", type=float, default=5)
+        parser.add_argument("--train_data_pct", type=float, default=train_data_pct)
         parser.add_argument("--warmup_steps", type=int, default=10)
         parser.add_argument("--anneal_lr_steps", type=int, default=100000)
         parser.add_argument("--anneal_lr", dest="anneal_lr", action="store_true")
@@ -727,8 +729,8 @@ def train(hparams: Namespace) -> None:
 
     trainer_args = {
         "max_steps": hparams.max_steps,
-        "min_steps": hparams.max_steps,
-        "max_epochs": int(1e8),
+        # "min_steps": hparams.max_steps,
+        "max_epochs": hparams.max_epochs,
         "val_check_interval": 1,
         "profiler": False,
         # "checkpoint_callback": checkpointer,
@@ -840,10 +842,11 @@ def compute_sharpness(hparams: Namespace, ckpts) -> None:
         phi = get_sharpness(model.train_dataloader(), model)
         results = {}
         results[ckpt] = phi
-        pickle.dump(results, open(f"results/results_SD-{i}.pkl", "wb"))
+        pickle.dump(results, open(f"results/results_SD-{ckpt}.pkl", "wb"))
 
 
-def add_args(parser=None) -> Namespace:
+@gin.configurable
+def training_args(parser=None, random_seed=42, max_epochs=int(1e6), max_steps=int(1e7)) -> Namespace:
     """
     Parses the command line arguments
 
@@ -851,10 +854,10 @@ def add_args(parser=None) -> Namespace:
     """
     if parser is None:
         parser = ArgumentParser()
-    parser.add_argument("--random_seed", type=int, default=-1)
+    parser.add_argument("--random_seed", type=int, default=random_seed)
     parser.add_argument("--gpu", type=int, default=0)
-    parser.add_argument("--max_epochs", type=int, default=None)
-    parser.add_argument("--max_steps", type=int, default=100000)
+    parser.add_argument("--max_epochs", type=int, default=max_epochs)
+    parser.add_argument("--max_steps", type=int, default=max_steps)
     # parser.add_argument("--checkpoint_period", type=int, default=1)
     parser = TrainableTransformer.add_model_specific_args(parser)
     return parser

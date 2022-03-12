@@ -36,7 +36,7 @@ def main():
         type=str,
         required=True,
     )
-    parser = grok.training.add_args(parser)
+    parser = grok.training.training_args(parser)
     args = parser.parse_args()
     print(args, flush=True)
 

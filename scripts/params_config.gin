@@ -1,0 +1,6 @@
+add_model_specific_args.train_data_pct=50
+add_model_specific_args.modulus=53
+add_model_specific_args.math_operator='+'
+training_args.random_seed=69
+training_args.max_epochs=-1
+training_args.max_steps=-1
