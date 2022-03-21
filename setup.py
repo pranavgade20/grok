@@ -14,6 +14,7 @@ setup(
         "mod",
         "matplotlib",
         "gin-config",
+        "sympy",
         "comet_ml"
     ],
 )
