@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Import comet_ml at the top of your file
+print("starting train.py execution...")
 import comet_ml
 import gin
 import gin.torch
