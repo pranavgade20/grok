@@ -7,8 +7,7 @@ import gin.torch
 import grok
 import os
 
-gin.parse_config_file('params_config.gin')
-
+gin.parse_config(os.getenv("GIN_CONFIG", ""))
 def main():
     parser = grok.training.training_args()
     parser.set_defaults(logdir=os.environ.get("GROK_LOGDIR", "."))
