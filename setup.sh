@@ -5,3 +5,5 @@ pip install setuptools==59.5.0
 ln -sf /usr/bin/python3.9 /usr/bin/python
 python setup.py install
 pip install -e .
+echo "PY_ENTRYPOINT is $PY_ENTRYPOINT"
+stat "$PY_ENTRYPOINT"
