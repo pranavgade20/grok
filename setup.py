@@ -13,6 +13,7 @@ setup(
         "scipy",
         "mod",
         "matplotlib",
-        "gin-config"
+        "gin-config",
+        "comet_ml"
     ],
 )

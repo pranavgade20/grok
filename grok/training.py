@@ -37,7 +37,7 @@ from grok.transformer import Transformer
 from grok.measure import get_sharpness
 
 DEFAULT_LOG_DIR = "logs"
-
+comet_logger = None
 
 class TrainableTransformer(LightningModule):
     """
@@ -710,6 +710,7 @@ def train(hparams: Namespace) -> None:
 
     # Create the model
     model = TrainableTransformer(hparams).float()
+    global comet_logger
     comet_logger = CometLogger(
         api_key='Ch9OIxODMWCZuK2LSscvbculp',
         rest_api_key='Ch9OIxODMWCZuK2LSscvbculp',
@@ -727,6 +728,7 @@ def train(hparams: Namespace) -> None:
     #     verbose=False,
     # )
 
+
     trainer_args = {
         "max_steps": hparams.max_steps,
         # "min_steps": hparams.max_steps,
@@ -734,6 +736,7 @@ def train(hparams: Namespace) -> None:
         "val_check_interval": 1,
         "profiler": False,
         # "checkpoint_callback": checkpointer,
+        # "logger": [logger],
         "logger": [comet_logger, logger],
         "log_every_n_steps": 1,
         "flush_logs_every_n_steps": 1000,
@@ -917,6 +920,7 @@ class CustomAdamW(torch.optim.Optimizer):
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
+                comet_logger.agg_and_log_metrics({'CustomAdamW_loss': loss.detach().item()})
 
         for group in self.param_groups:
             for p in group["params"]:
