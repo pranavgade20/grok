@@ -74,7 +74,7 @@ def train(hparams: Namespace) -> None:
 
         eq_position = torch.nonzero(data[0] == tokenizer.stoi["="]).item()
 
-        y_rhs = data[..., eq_position + 1:-1]
+        y_rhs = data[..., eq_position + 2:]
         y_hat_rhs = y_hat[..., eq_position + 1:]
 
         loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
@@ -82,7 +82,20 @@ def train(hparams: Namespace) -> None:
         optim.step()
 
         epoch.update(1)
-        epoch.set_postfix({'loss': loss.detach().cpu().item()})
+        with torch.no_grad():
+            y_hat, attentions, values = transformer(
+                x=val_dataset[..., :-1]
+            )
+            y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
+
+            eq_position = torch.nonzero(val_dataset[0] == tokenizer.stoi["="]).item()
+
+            y_rhs = val_dataset[..., eq_position + 2:]
+            y_hat_rhs = y_hat[..., eq_position + 1:]
+
+            val_loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
+
+        epoch.set_postfix({'loss': loss.detach().cpu().item(), 'val_loss': val_loss.item()})
 
 
 if __name__ == '__main__':
