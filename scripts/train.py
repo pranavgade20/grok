@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-print("starting train.py execution...")
 import comet_ml
 import gin
 import gin.torch
