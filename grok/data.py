@@ -20,7 +20,7 @@ import blobfile as bf
 VALID_OPERATORS = {
     "+": "addition",
     "-": "subtraction",
-    "*": "muliplication",
+    "*": "multiplication",
     "/": "division",
     "**2+": "squarepoly",
     "**3+": "cubepoly",
@@ -43,7 +43,6 @@ EOS_TOKEN = "<|eos|>"
 EQ_TOKEN = "="
 MODULUS = 97
 NUMS = list(range(MODULUS))
-
 DEFAULT_DATA_DIR = "data"
 
 
@@ -72,10 +71,12 @@ class ArithmeticTokenizer:
 
     token_file = "tokens.txt"
 
-    def __init__(self, data_dir=DEFAULT_DATA_DIR) -> None:
+    def __init__(self, data_dir=DEFAULT_DATA_DIR, modulus=MODULUS) -> None:
+        self.modulus = modulus
+        self.nums = list(range(modulus))
         self.token_file = bf.join(data_dir, self.token_file)
 
-        self.itos = self.get_tokens()
+        self.itos = self.get_tokens(nums=self.nums)
 
         self.stoi: Dict[str, int] = dict([(s, i) for i, s in enumerate(self.itos)])
 
@@ -123,11 +124,11 @@ class ArithmeticTokenizer:
         return len(self.itos)
 
     @classmethod
-    def get_tokens(cls):
+    def get_tokens(cls, nums=NUMS):
         tokens = (
             [EOS_TOKEN, EQ_TOKEN]
             + list(sorted(list(VALID_OPERATORS.keys())))
-            + list(map(render, NUMS))
+            + list(map(render, nums))
             + list(map(render, itertools.permutations(range(5))))  # s5
         )
         return tokens
@@ -143,6 +144,7 @@ class ArithmeticDataset:
         operator: str,
         operand_length: Optional[int] = None,
         data_dir: str = DEFAULT_DATA_DIR,
+        modulus=MODULUS
     ):
         """
         Creates training and validation datasets
@@ -154,6 +156,9 @@ class ArithmeticDataset:
         """
 
         assert (0 < train_pct) and (train_pct < 100)
+
+        cls.modulus = MODULUS
+        cls.nums = list(range(modulus))
 
         ds_name = cls.get_dsname(operator, operand_length)
         eqs = cls.make_data(operator, operand_length)
@@ -198,7 +203,7 @@ class ArithmeticDataset:
     #    return " ".join(map(render, parts))
 
     @classmethod
-    def _make_binary_operation_data(cls, operator: str, operands=None) -> List[str]:
+    def _make_binary_operation_data(cls, operator: str, operands=None, modulus=MODULUS) -> List[str]:
         if operator == "s5":
             operands = operands or list(range(5))
             elems = map(np.array, itertools.permutations(operands))
@@ -212,7 +217,7 @@ class ArithmeticDataset:
             elems = [Mod(i, modulo) for i in range(modulo)]
             tuples = itertools.product(elems, repeat=2)
         else:
-            operands = operands or NUMS
+            operands = operands or cls.nums
             tuples = itertools.product(operands, repeat=2)
 
         # if operator == "s5":
@@ -225,7 +230,7 @@ class ArithmeticDataset:
                     continue
                 else:
                     c = a
-                    a = (b * c) % MODULUS
+                    a = (b * c) % modulus
             elif operator == "s5":
                 c = b[a]
             elif operator == "s5conj":
@@ -234,20 +239,20 @@ class ArithmeticDataset:
                 c = a * b * a
             elif operator == "+*":
                 if a % 2 == 0:
-                    c = (a + b) % MODULUS
+                    c = (a + b) % modulus
                 else:
-                    c = (a * b) % MODULUS
+                    c = (a * b) % modulus
             elif operator == "+-":
                 if a % 2 == 0:
-                    c = (a + b) % MODULUS
+                    c = (a + b) % modulus
                 else:
-                    c = (a - b) % MODULUS
+                    c = (a - b) % modulus
             elif "_mod_" in operator:
                 expression = operator.split("_mod_")[0]
                 function = eval(f"lambda x, y: ({expression})")
                 c = function(a, b)
             else:
-                c = eval(f"({a} {operator} {b}) % {MODULUS}")
+                c = eval(f"({a} {operator} {b}) % {modulus}")
             eq = " ".join(map(render, [a, operator, b, "=", c]))
             eqs.append(eq)
 
@@ -377,11 +382,11 @@ class ArithmeticDataset:
     #        fh.writelines([EOS_TOKEN + " " + eq + " " + EOS_TOKEN + "\n" for eq in eqs])
 
     @classmethod
-    def _make_lists(cls, sizes=[2, 3], nums=NUMS):
+    def _make_lists(cls, sizes=[2, 3]):
         lists: dict = {}
         for size in sizes:
             lists[size] = torch.tensor(
-                list(itertools.permutations(nums, r=size)),
+                list(itertools.permutations(cls.nums, r=size)),
                 dtype=torch.int,
             )
         return lists
