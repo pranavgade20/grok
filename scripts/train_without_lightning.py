@@ -1,3 +1,6 @@
+from tempfile import mkdtemp
+
+from comet_ml import Experiment
 import math
 import os
 from argparse import Namespace
@@ -33,11 +36,12 @@ def train(hparams: Namespace) -> None:
         operator=hparams.math_operator,  # type: ignore
         operand_length=hparams.operand_length,  # type: ignore
         data_dir=hparams.datadir,  # type: ignore
+        modulus=MODULUS
     )
     train_dataset = train_dataset.data.to(device='cuda')
     val_dataset = val_dataset.data.to(device='cuda')
 
-    tokenizer = ArithmeticTokenizer()
+    tokenizer = ArithmeticTokenizer(modulus=MODULUS)
 
     transformer = Transformer(
         hparams.n_layers,
@@ -53,7 +57,7 @@ def train(hparams: Namespace) -> None:
 
     optim = torch.optim.AdamW(
         transformer.parameters(),
-        lr=1,
+        lr=10e-3,
         betas=(0.9, 0.98),
         eps=1e-8,
         weight_decay=hparams.weight_decay,
@@ -62,40 +66,71 @@ def train(hparams: Namespace) -> None:
     if hparams.batchsize == 0:
         hparams.batchsize = min(512, math.ceil(len(train_dataset) / 2.0))
 
+    experiment = Experiment(project_name="grok")
+    experiment.log_parameters(hparams)
+
+    temp_dir = mkdtemp()
+    torch.save(hparams, f'{temp_dir}/hparams.pt')
+    with open(f'{temp_dir}/hparams.pt', 'rb') as f:
+        experiment.log_asset(f, f'hparams.pt')
+
     epoch = tqdm.tqdm()
 
-    while epoch.n != hparams.max_epochs:
-        data = train_dataset[torch.randint(len(train_dataset), (hparams.batchsize,))]
-        optim.zero_grad()
-        y_hat, attentions, values = transformer(
-            x=data[..., :-1]
-        )
-        y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
-
-        eq_position = torch.nonzero(data[0] == tokenizer.stoi["="]).item()
-
-        y_rhs = data[..., eq_position + 2:]
-        y_hat_rhs = y_hat[..., eq_position + 1:]
-
-        loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
-        loss.backward()
-        optim.step()
-
-        epoch.update(1)
-        with torch.no_grad():
-            y_hat, attentions, values = transformer(
-                x=val_dataset[..., :-1]
+    try:
+        while epoch.n != hparams.max_epochs:
+            data = train_dataset[torch.randint(len(train_dataset), (hparams.batchsize,))]
+            optim.zero_grad()
+            y_hat, _, _ = transformer(
+                x=data[..., :-1]
             )
             y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
 
-            eq_position = torch.nonzero(val_dataset[0] == tokenizer.stoi["="]).item()
+            eq_position = torch.nonzero(data[0] == tokenizer.stoi["="]).item()
 
-            y_rhs = val_dataset[..., eq_position + 2:]
-            y_hat_rhs = y_hat[..., eq_position + 1:]
+            y_rhs = data[..., eq_position + 1:]
+            y_hat_rhs = y_hat[..., eq_position:]
 
-            val_loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
+            loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
+            loss.backward()
+            optim.step()
 
-        epoch.set_postfix({'loss': loss.detach().cpu().item(), 'val_loss': val_loss.item()})
+            epoch.update(1)
+            with torch.no_grad():
+                y_hat, _, _ = transformer(
+                    x=val_dataset[..., :-1]
+                )
+                y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
+
+                eq_position = torch.nonzero(val_dataset[0] == tokenizer.stoi["="]).item()
+
+                y_rhs = val_dataset[..., eq_position + 1:-1]
+                y_hat_rhs = y_hat[..., eq_position + 1:]
+
+                val_loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
+
+                # y_hat, attentions, values = transformer(
+                #     x=train_dataset[..., :-1]
+                # )
+                # y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
+                #
+                # eq_position = torch.nonzero(train_dataset[0] == tokenizer.stoi["="]).item()
+                #
+                # y_rhs = train_dataset[..., eq_position + 2:]
+                # y_hat_rhs = y_hat[..., eq_position + 1:]
+                #
+                # full_train_loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
+
+            metrics = {'loss': loss.detach().cpu().item(), 'val_loss': val_loss.item()}  # , 'full_train_loss': full_train_loss.item()}
+            epoch.set_postfix(metrics)
+            experiment.log_metrics(metrics)
+
+            if epoch.n % 10_000 == 0:
+                torch.save(transformer, f'{temp_dir}/transformer_{epoch.n}.pt')
+                experiment.log_model(f'transformer_{epoch.n}.pt', f'{temp_dir}/transformer_{epoch.n}.pt')
+    except KeyboardInterrupt:
+        print("caught keyboard interrupt, logging model to comet...")
+        torch.save(transformer, f'{temp_dir}/transformer_{epoch.n}.pt')
+        experiment.log_model(f'transformer_{epoch.n}.pt', f'{temp_dir}/transformer_{epoch.n}.pt')
 
 
 if __name__ == '__main__':
@@ -109,4 +144,4 @@ if __name__ == '__main__':
     hparams.logdir = os.path.abspath(hparams.logdir)
 
     print(hparams)
-    print(train(hparams))
+    train(hparams)
