@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 from tempfile import mkdtemp
-
-from comet_ml import Experiment
 import math
 import os
 from argparse import Namespace
 
+from comet_ml import Experiment
+from argparse import Namespace
+from IPython import embed
+
 import gin
 import torch
+from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from grok.data import ArithmeticDataset, ArithmeticTokenizer
 from grok.transformer import Transformer
+from grok.training import TrainableTransformer
 
 
 def train(hparams: Namespace) -> None:
@@ -70,11 +74,15 @@ def train(hparams: Namespace) -> None:
 
     optim = torch.optim.AdamW(
         transformer.parameters(),
-        lr=10e-3,
+        lr=hparams.max_lr,
         betas=(0.9, 0.98),
         eps=1e-8,
         weight_decay=hparams.weight_decay,
     )
+
+    lr_scheduler = LambdaLR(
+            optim,
+            lr_lambda=lambda n: TrainableTransformer._scheduler_lr(Namespace(hparams=hparams), n))
 
     experiment = Experiment(project_name="grok")
     experiment.log_parameters(hparams)
@@ -121,9 +129,13 @@ def train(hparams: Namespace) -> None:
                         torch.cat(predictions),
                         torch.cat(expected), reduction='mean')
 
-            metrics = {'loss': loss.item(), 'val_loss': val_loss.item()}
+            metrics = {
+                    'loss': loss.item(),
+                    'val_loss': val_loss.item(),
+                    'lr': lr_scheduler.get_last_lr()[0]}
             epoch.set_postfix(metrics)
             experiment.log_metrics(metrics)
+            lr_scheduler.step()
             epoch.update(1)
 
             if epoch.n % 10_000 == 0:
