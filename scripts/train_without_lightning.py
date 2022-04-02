@@ -2,6 +2,7 @@
 from tempfile import mkdtemp
 import math
 import os
+import pathlib
 from argparse import Namespace
 
 from comet_ml import Experiment
@@ -87,10 +88,12 @@ def train(hparams: Namespace) -> None:
 
     experiment = Experiment(project_name="grok")
     experiment.log_parameters(hparams)
+    experiment_name = experiment.get_name()
+    experiment_dir = pathlib.Path('experiments')/experiment_name
 
-    temp_dir = mkdtemp()
-    torch.save(hparams, f'{temp_dir}/hparams.pt')
-    with open(f'{temp_dir}/hparams.pt', 'rb') as f:
+    os.makedirs(experiment_dir)
+    torch.save(hparams, experiment_dir/'hparams.pt')
+    with open(experiment_dir/'hparams.pt', 'rb') as f:
         experiment.log_asset(f, f'hparams.pt')
 
     epoch = tqdm(total=hparams.max_epochs)
@@ -136,12 +139,12 @@ def train(hparams: Namespace) -> None:
             epoch.update(1)
 
             if epoch.n % 10_000 == 0:
-                torch.save(transformer, f'{temp_dir}/transformer_{epoch.n}.pt')
-                experiment.log_model(f'transformer_{epoch.n}.pt', f'{temp_dir}/transformer_{epoch.n}.pt')
+                torch.save(transformer, experiment_dir/f'transformer_{epoch.n}.pt')
+                experiment.log_model(f'transformer_{epoch.n}.pt', experiment_dir/f'transformer_{epoch.n}.pt')
     except KeyboardInterrupt:
-        print("caught keyboard interrupt, logging model to comet...")
-        torch.save(transformer, f'{temp_dir}/transformer_{epoch.n}.pt')
-        experiment.log_model(f'transformer_{epoch.n}.pt', f'{temp_dir}/transformer_{epoch.n}.pt')
+        print("caught keyboard interrupt, saving model checkpoint...")
+        torch.save(transformer, experiment_dir/f'transformer_{epoch.n}.pt')
+        experiment.log_model(f'transformer_{epoch.n}.pt', experiment_dir/f'transformer_{epoch.n}.pt')
 
 
 if __name__ == '__main__':
