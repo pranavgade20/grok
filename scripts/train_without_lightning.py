@@ -110,21 +110,26 @@ def train(hparams: Namespace) -> None:
                 loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
                 loss.backward()
                 optim.step()
+            train_accuracy = torch.sum(torch.argmax(y_hat_rhs, dim=-2) == y_rhs) / torch.numel(y_rhs)
 
             with torch.no_grad():
                 y_hat, _, _ = transformer(
                     x=val_dataset[..., :-1]
                 )
                 y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
-
+                y = val_dataset[..., eq_position+1:]
                 val_loss = torch.nn.functional.cross_entropy(
                         y_hat[..., eq_position:],
-                        val_dataset[..., eq_position+1:], reduction='mean')
+                        y, reduction='mean')
+                val_accuracy = torch.sum(torch.argmax(y_hat[..., eq_position:], dim=-2) == y) / torch.numel(y)
 
             metrics = {
-                    'loss': loss.item(),
+                    'train_loss': loss.item(),
                     'val_loss': val_loss.item(),
-                    'lr': lr_scheduler.get_last_lr()[0]}
+                    'train_accuracy': train_accuracy.item(),
+                    'val_accuracy': val_accuracy.item(),
+                    'lr': lr_scheduler.get_last_lr()[0],
+            }
             epoch.set_postfix(metrics)
             experiment.log_metrics(metrics)
             lr_scheduler.step()
