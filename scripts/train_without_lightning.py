@@ -108,19 +108,7 @@ def train(hparams: Namespace) -> None:
 
                 val_loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
 
-                # y_hat, attentions, values = transformer(
-                #     x=train_dataset[..., :-1]
-                # )
-                # y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
-                #
-                # eq_position = torch.nonzero(train_dataset[0] == tokenizer.stoi["="]).item()
-                #
-                # y_rhs = train_dataset[..., eq_position + 2:]
-                # y_hat_rhs = y_hat[..., eq_position + 1:]
-                #
-                # full_train_loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
-
-            metrics = {'loss': loss.detach().cpu().item(), 'val_loss': val_loss.item()}  # , 'full_train_loss': full_train_loss.item()}
+            metrics = {'loss': loss.detach().cpu().item(), 'val_loss': val_loss.item()}
             epoch.set_postfix(metrics)
             experiment.log_metrics(metrics)
 
