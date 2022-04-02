@@ -564,7 +564,7 @@ class TrainableTransformer(LightningModule):
         :param batch_idx: which batch this is in the epoch.
         :returns: a dict with val_loss, val_accuracy
         """
-        validation_is_real = len(outputs[0]) != 0
+        validation_is_real = len(outputs) > 0 and len(outputs[0]) != 0
 
         if validation_is_real:
             self.next_epoch_to_eval = max(

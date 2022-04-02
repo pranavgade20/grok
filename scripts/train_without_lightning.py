@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from tempfile import mkdtemp
 
 from comet_ml import Experiment
@@ -7,7 +8,8 @@ from argparse import Namespace
 
 import gin
 import torch
-import tqdm
+from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from grok.data import ArithmeticDataset, ArithmeticTokenizer
 from grok.transformer import Transformer
@@ -38,8 +40,19 @@ def train(hparams: Namespace) -> None:
         data_dir=hparams.datadir,  # type: ignore
         modulus=MODULUS
     )
-    train_dataset = train_dataset.data.to(device='cuda')
-    val_dataset = val_dataset.data.to(device='cuda')
+
+    if hparams.batchsize == 0:
+        hparams.batchsize = min(512, math.ceil(len(train_dataset) / 2.0))
+
+    train_dataloader = DataLoader(
+            train_dataset.data.to(device='cuda'),
+            batch_size=hparams.batchsize,
+            shuffle=True)
+
+    val_dataloader = DataLoader(
+            val_dataset.data.to(device='cuda'),
+            batch_size=hparams.batchsize,
+            )
 
     tokenizer = ArithmeticTokenizer(modulus=MODULUS)
 
@@ -63,9 +76,6 @@ def train(hparams: Namespace) -> None:
         weight_decay=hparams.weight_decay,
     )
 
-    if hparams.batchsize == 0:
-        hparams.batchsize = min(512, math.ceil(len(train_dataset) / 2.0))
-
     experiment = Experiment(project_name="grok")
     experiment.log_parameters(hparams)
 
@@ -74,43 +84,47 @@ def train(hparams: Namespace) -> None:
     with open(f'{temp_dir}/hparams.pt', 'rb') as f:
         experiment.log_asset(f, f'hparams.pt')
 
-    epoch = tqdm.tqdm()
-
+    epoch = tqdm(total=hparams.max_epochs)
     try:
         while epoch.n != hparams.max_epochs:
-            data = train_dataset[torch.randint(len(train_dataset), (hparams.batchsize,))]
-            optim.zero_grad()
-            y_hat, _, _ = transformer(
-                x=data[..., :-1]
-            )
-            y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
-
-            eq_position = torch.nonzero(data[0] == tokenizer.stoi["="]).item()
-
-            y_rhs = data[..., eq_position + 1:]
-            y_hat_rhs = y_hat[..., eq_position:]
-
-            loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
-            loss.backward()
-            optim.step()
-
-            epoch.update(1)
-            with torch.no_grad():
-                y_hat, _, _ = transformer(
-                    x=val_dataset[..., :-1]
+            loss = -1
+            for batch in train_dataloader:
+                optim.zero_grad()
+                y_hat, attentions, values = transformer(
+                    x=batch[..., :-1]
                 )
                 y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
 
-                eq_position = torch.nonzero(val_dataset[0] == tokenizer.stoi["="]).item()
+                eq_position = torch.nonzero(batch[0] == tokenizer.stoi["="]).item()
 
-                y_rhs = val_dataset[..., eq_position + 1:-1]
-                y_hat_rhs = y_hat[..., eq_position + 1:]
+                y_rhs = batch[..., eq_position + 1:]
+                y_hat_rhs = y_hat[..., eq_position:]
 
-                val_loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
+                loss = torch.nn.functional.cross_entropy(y_hat_rhs, y_rhs, reduction='mean')
+                loss.backward()
+                optim.step()
 
-            metrics = {'loss': loss.detach().cpu().item(), 'val_loss': val_loss.item()}
+            with torch.no_grad():
+                predictions = []
+                expected = []
+                for batch in val_dataloader:
+                    y_hat, attentions, values = transformer(
+                        x=batch[..., :-1]
+                    )
+                    y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
+                    eq_position = torch.nonzero(batch[0] == tokenizer.stoi["="]).item()
+
+                    predictions.append(y_hat[..., eq_position:])
+                    expected.append(batch[..., eq_position+1:])
+
+                val_loss = torch.nn.functional.cross_entropy(
+                        torch.cat(predictions),
+                        torch.cat(expected), reduction='mean')
+
+            metrics = {'loss': loss.item(), 'val_loss': val_loss.item()}
             epoch.set_postfix(metrics)
             experiment.log_metrics(metrics)
+            epoch.update(1)
 
             if epoch.n % 10_000 == 0:
                 torch.save(transformer, f'{temp_dir}/transformer_{epoch.n}.pt')
