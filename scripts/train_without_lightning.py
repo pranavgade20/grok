@@ -6,7 +6,6 @@ from argparse import Namespace
 
 from comet_ml import Experiment
 from argparse import Namespace
-from IPython import embed
 
 import gin
 import torch
@@ -53,10 +52,11 @@ def train(hparams: Namespace) -> None:
             batch_size=hparams.batchsize,
             shuffle=True)
 
-    val_dataloader = DataLoader(
-            val_dataset.data.to(device='cuda'),
-            batch_size=hparams.batchsize,
-            )
+    val_dataset = val_dataset.data.to(device='cuda')
+    # val_dataloader = DataLoader(
+    #         val_dataset.data.to(device='cuda'),
+    #         batch_size=hparams.batchsize,
+    #         )
 
     tokenizer = ArithmeticTokenizer(modulus=MODULUS)
 
@@ -71,6 +71,7 @@ def train(hparams: Namespace) -> None:
         weight_noise=hparams.weight_noise,
     ).to(device='cuda')
     transformer.to(torch.float32)  # for some reason, all internal types aren't consistent
+    eq_position = torch.nonzero(val_dataset[0] == tokenizer.stoi["="]).item()
 
     optim = torch.optim.AdamW(
         transformer.parameters(),
@@ -98,12 +99,10 @@ def train(hparams: Namespace) -> None:
             loss = -1
             for batch in train_dataloader:
                 optim.zero_grad()
-                y_hat, attentions, values = transformer(
+                y_hat, _, _ = transformer(
                     x=batch[..., :-1]
                 )
                 y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
-
-                eq_position = torch.nonzero(batch[0] == tokenizer.stoi["="]).item()
 
                 y_rhs = batch[..., eq_position + 1:]
                 y_hat_rhs = y_hat[..., eq_position:]
@@ -113,21 +112,14 @@ def train(hparams: Namespace) -> None:
                 optim.step()
 
             with torch.no_grad():
-                predictions = []
-                expected = []
-                for batch in val_dataloader:
-                    y_hat, attentions, values = transformer(
-                        x=batch[..., :-1]
-                    )
-                    y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
-                    eq_position = torch.nonzero(batch[0] == tokenizer.stoi["="]).item()
-
-                    predictions.append(y_hat[..., eq_position:])
-                    expected.append(batch[..., eq_position+1:])
+                y_hat, _, _ = transformer(
+                    x=val_dataset[..., :-1]
+                )
+                y_hat = y_hat.transpose(-2, -1)  # to make shape = batchsize * vocab_size * context_len
 
                 val_loss = torch.nn.functional.cross_entropy(
-                        torch.cat(predictions),
-                        torch.cat(expected), reduction='mean')
+                        y_hat[..., eq_position:],
+                        val_dataset[..., eq_position+1:], reduction='mean')
 
             metrics = {
                     'loss': loss.item(),
