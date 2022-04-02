@@ -74,7 +74,7 @@ def train(hparams: Namespace) -> None:
 
     optim = torch.optim.AdamW(
         transformer.parameters(),
-        lr=hparams.max_lr,
+        lr=1.,
         betas=(0.9, 0.98),
         eps=1e-8,
         weight_decay=hparams.weight_decay,
