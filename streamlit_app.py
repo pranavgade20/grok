@@ -20,7 +20,8 @@ from grok.data import ArithmeticTokenizer, EOS_TOKEN
 
 torch.set_grad_enabled(False)
 
-st.title('Grokked transformer analysis tool')
+st.set_page_config(page_title="Failure cases analysis tool")
+st.title('Failure cases analysis tool for arthmetic transformers')
 
 tokenizer = ArithmeticTokenizer(modulus=97)
 
@@ -54,6 +55,8 @@ col1.selectbox("",
              get_experiments().keys(),
              key='experiment_selectbox',
              index=0)
+col2.write("")
+col2.write("")
 if col2.button('Select experiment'):
     on_experiment_select()
 
@@ -88,12 +91,16 @@ def on_checkpoint_select():
         failure_cases = pd.DataFrame(failure_cases, columns=('x', 'y', 'predicted', 'expected'))
 
     st.write(f"{failure_cases.shape[0]} failure cases found (of {97*97} cases)")
+    st.write("For following x, y values the model predicted the continuation of '<x> + <y> = ...' incorrectly")
     st.dataframe(failure_cases)
     correct_map = np.zeros((97, 97))
     for x, y in failure_cases[['x', 'y']].to_numpy():
         correct_map[x, y] = 1
     fig, ax = plt.subplots()
     ax.imshow(correct_map, origin='lower')
+    ax.set_title("Failure cases distribution for '<x> + <y> =...' continuation prediction")
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
     st.pyplot(fig)
 
 
@@ -114,5 +121,7 @@ if 'experiment_selected' in st.session_state:
                        options=sorted(st.session_state.models.keys()),
                        key='checkpoint_select_slider',
                        format_func=lambda x: f"{x:.2e}")
+    col2.write("")
+    col2.write("")
     if col2.button("Evaluate checkpoint"):
         on_checkpoint_select()
