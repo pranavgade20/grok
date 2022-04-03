@@ -21,7 +21,7 @@ from grok.data import ArithmeticTokenizer, EOS_TOKEN
 torch.set_grad_enabled(False)
 
 st.set_page_config(page_title="Failure cases analysis tool")
-st.title('Failure cases analysis tool for arthmetic transformers')
+st.title('Failure cases analysis tool for arithmetic transformers')
 
 tokenizer = ArithmeticTokenizer(modulus=97)
 
