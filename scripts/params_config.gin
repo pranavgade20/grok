@@ -4,3 +4,4 @@ add_model_specific_args.math_operator='+'
 training_args.random_seed=42
 training_args.max_epochs=-1
 training_args.max_steps=-1
+training_args.checkpoint_period=2

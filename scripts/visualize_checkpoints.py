@@ -7,6 +7,7 @@ import gin
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import tqdm
 
 from grok.data import VALID_OPERATORS, EOS_TOKEN, ArithmeticDataset
 
@@ -43,6 +44,7 @@ def main(hparams):
     data = data.to(device='cuda')
 
     i = checkpoint_period
+    tbar = tqdm.tqdm()
     while (pathlib.Path('experiments') / experiment_name / f'transformer_{i}.pt').is_file():
         model = torch.load(pathlib.Path('experiments') / experiment_name / f'transformer_{i}.pt', map_location=torch.device('cpu'))
         model.to(device='cuda')
@@ -51,6 +53,8 @@ def main(hparams):
         plt.imshow((preds == data[...,-2]).cpu().numpy())
         plt.savefig(pathlib.Path('experiments') / experiment_name / f'fig_{i}.png')
         i += checkpoint_period
+        tbar.set_postfix({"i": i})
+        tbar.update(1)
 
 
 if __name__ == '__main__':
