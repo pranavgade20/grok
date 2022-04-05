@@ -138,7 +138,7 @@ def train(hparams: Namespace) -> None:
             lr_scheduler.step()
             epoch.update(1)
 
-            if epoch.n % 5_000 == 0:
+            if epoch.n % hparams.checkpoint_period == 0:
                 torch.save(transformer, experiment_dir/f'transformer_{epoch.n}.pt')
                 experiment.log_model(f'transformer_{epoch.n}.pt', str(experiment_dir/f'transformer_{epoch.n}.pt'))
     except KeyboardInterrupt:

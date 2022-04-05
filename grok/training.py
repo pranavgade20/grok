@@ -849,7 +849,7 @@ def compute_sharpness(hparams: Namespace, ckpts) -> None:
 
 
 @gin.configurable
-def training_args(parser=None, random_seed=42, max_epochs=int(1e6), max_steps=int(1e7)) -> Namespace:
+def training_args(parser=None, random_seed=42, max_epochs=int(1e6), max_steps=int(1e7), checkpoint_period=5_000) -> Namespace:
     """
     Parses the command line arguments
 
@@ -861,7 +861,7 @@ def training_args(parser=None, random_seed=42, max_epochs=int(1e6), max_steps=in
     parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--max_epochs", type=int, default=max_epochs)
     parser.add_argument("--max_steps", type=int, default=max_steps)
-    # parser.add_argument("--checkpoint_period", type=int, default=1)
+    parser.add_argument("--checkpoint_period", type=int, default=checkpoint_period)
     parser = TrainableTransformer.add_model_specific_args(parser)
     return parser
 
