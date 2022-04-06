@@ -44,18 +44,16 @@ def main(hparams):
     data = data.to(device='cuda')
 
     i = checkpoint_period
-    tbar = tqdm.tqdm()
+    tbar = tqdm.tqdm(total=len(list((pathlib.Path('experiments') / experiment_name).glob('*.pt'))))
     while (pathlib.Path('experiments') / experiment_name / f'transformer_{i}.pt').is_file():
         model = torch.load(pathlib.Path('experiments') / experiment_name / f'transformer_{i}.pt', map_location=torch.device('cpu'))
         model.to(device='cuda')
         model.eval()
-        preds = torch.argmax(model(data)[0][...,-3,:])
+        preds = torch.argmax(model(data)[0][...,-3,:], dim=-1)
         plt.imshow((preds == data[...,-2]).cpu().numpy())
         plt.savefig(pathlib.Path('experiments') / experiment_name / f'fig_{i}.png')
-        i += checkpoint_period
-        tbar.set_postfix({"i": i})
         tbar.update(1)
-
+        i += checkpoint_period
 
 if __name__ == '__main__':
     gin.parse_config_file('params_config.gin')
