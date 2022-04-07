@@ -50,8 +50,9 @@ def main(hparams):
         model.to(device='cuda')
         model.eval()
         preds = torch.argmax(model(data)[0][...,-3,:], dim=-1)
-        plt.imshow((preds == data[...,-2]).cpu().numpy())
-        plt.savefig(pathlib.Path('experiments') / experiment_name / f'fig_{i}.png')
+        fig, ax = plt.subplots()
+        ax.imshow((preds == data[...,-2]).cpu().numpy())
+        fig.savefig(pathlib.Path('experiments') / experiment_name / f'fig_{i}.png')
         tbar.update(1)
         i += checkpoint_period
 
