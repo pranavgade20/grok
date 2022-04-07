@@ -49,10 +49,11 @@ def main(hparams):
         model = torch.load(pathlib.Path('experiments') / experiment_name / f'transformer_{i}.pt', map_location=torch.device('cpu'))
         model.to(device='cuda')
         model.eval()
-        preds = torch.argmax(model(data)[0][...,-3,:], dim=-1)
+        preds = torch.argmax(model(data[...,:-2])[0][...,-1,:], dim=-1)
         fig, ax = plt.subplots()
         ax.imshow((preds == data[...,-2]).cpu().numpy())
         fig.savefig(pathlib.Path('experiments') / experiment_name / f'fig_{i}.png')
+        fig.close()
         tbar.update(1)
         i += checkpoint_period
 
