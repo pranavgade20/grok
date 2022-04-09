@@ -148,7 +148,11 @@ def train(hparams: Namespace) -> None:
 
 
 if __name__ == '__main__':
-    gin.parse_config_file('params_config.gin')
+    gin_cfg = os.getenv("GIN_CONFIG", "NO GIN CONFIG")
+    if gin_cfg == "NO GIN CONFIG":
+        gin.parse_config_file('params_config.gin')
+    else:
+        gin.parse_config(gin_cfg)
 
     import grok
     parser = grok.training.training_args()
